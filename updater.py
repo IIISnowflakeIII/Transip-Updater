@@ -52,6 +52,7 @@ def main():
     domain = os.environ['domain']
     keyfile = '/keyfile/key'
 
+    # Check if keyfile is present
     print("Checking if keyfile is present...")
     if os.path.isfile(keyfile):
         print("Key found!")
@@ -65,6 +66,7 @@ def main():
     # Client to connect to the TransIP API
     client = TransIP(login=username, private_key_file=keyfile)
 
+    # Run every 60 seconds
     while True:
         sleep(60 - time() % 60)
         try:
