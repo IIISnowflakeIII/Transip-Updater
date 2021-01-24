@@ -1,2 +1,2 @@
-transip
+python-transip
 schedule
