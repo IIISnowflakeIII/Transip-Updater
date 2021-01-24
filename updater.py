@@ -10,7 +10,7 @@ from transip.exceptions import TransIPError
 def update_dns(client, name, address):
     """
     Ensure all DNS A-records of a single domainname have the correct IP-address
-    as there content.
+    as their content.
 
     Args:
         client (transip.TransIP): The TransIP API client.
