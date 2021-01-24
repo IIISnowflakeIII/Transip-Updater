@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from time import time, sleep
+from requests import get
 import os
 
 from transip import TransIP
