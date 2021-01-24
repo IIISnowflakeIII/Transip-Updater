@@ -1,61 +1,76 @@
 #!/usr/bin/env python3
-from transip.service.domain import DomainService
-from transip.service.objects import DnsEntry
-from pathlib import Path
-from requests import get
 from time import time, sleep
 import os
 
-# Print startup to console
-print("Starting TransIP DNS Updater...")
+from transip import TransIP
+from transip.exceptions import TransIPError
 
-# Check if keyfile exists
-print("Checking if keyfile is present...")
-try:
-    with open('/keyfile/key') as x:
+
+def update_dns(client, name, address):
+    """
+    Ensure all DNS A-records of a single domainname have the correct IP-address
+    as there content.
+
+    Args:
+        client (transip.TransIP): The TransIP API client.
+        name (str): The domainname.
+        address (str): The IP-address.
+    """
+    domain = client.domains.get(name)
+
+    # List all DNS records of the domain
+    records = domain.dns.list()
+
+    updates = False
+    for record in records:
+        if record.type == "A" and record.content != address:
+            print(f"{record.name} record is using an old IP: {record.content}")
+            # Set the content of the A-record to the specified address
+            record.content = address
+            updates = True
+
+    # Only attempt to update the DNS records when changes where made to the
+    # existing records.
+    if updates:
+        print("Updating DNS records")
+        try:
+            domain.dns.replace(records)
+        except TransIPError as exc:
+            print("Failed to update DNS records!")
+        finally:
+            print("DNS records successfully updated!")
+
+    print("All records are up to date!")
+
+
+def main():
+    print("Starting TransIP DNS Updater...")
+
+    # Get the variables set within Docker
+    username = os.environ['username']
+    domain = os.environ['domain']
+    keyfile = '/keyfile/key'
+
+    print("Checking if keyfile is present...")
+    if os.path.isfile(keyfile):
         print("Key found!")
-except IOError:
-    print("No key provided, exiting...")
-    exit()
-    
-# Get the variables set within Docker
-username = os.environ['username']
-domain = os.environ['domain']
-keyfile = '/keyfile/key'
+    else:
+        print("No key provided, exiting...")
+        return
 
-# Get the current external IP
-extIP = get('https://ipapi.co/ip/').text
+    # Get the current external IP
+    extIP = get('https://ipapi.co/ip/').text
 
-# Client to connect to the TransIP API
-client = DomainService(username, private_key_file=keyfile)
+    # Client to connect to the TransIP API
+    client = TransIP(login=username, private_key_file=keyfile)
 
-# Update the DNS
-def update_dns():
-  for entry in client.get_info(domain).dnsEntries:
-    if entry.type == "A":
-      if entry.content != extIP:
-        print(entry.name + " record is using an old IP: " + entry.content)
+    while True:
+        sleep(60 - time() % 60)
+        try:
+            update_dns(client, domain, extIP)
+        except TransIPError as exc:
+            print(f"Failed to update the DNS records: {exc}")
 
-        # DNS Entry list with current external IP
-        oldList = []
-        list = DnsEntry(entry.name, entry.expire, entry.type, entry.content)
-        oldList.append(list)
-        # Remove old DNS entry
-        print("Removing old entry...")
-        client.remove_dns_entries(domain, oldList)
 
-        # DNS Entry list with new external IP
-        newList = [] 
-        list = DnsEntry(entry.name, entry.expire, entry.type, extIP)
-        newList.append(list)
-        # Add new DNS entry
-        print("Creating new entry...")
-        client.add_dns_entries(domain, newList)
-        print("New entry created successfully!")
-  print("All records are up to date! \n")
-#endDef
-  
-while True:
-    sleep(60 - time() % 60)
-    update_dns()
-#EOF
+if __name__ == '__main__':
+    main()
